@@ -31,7 +31,7 @@
 /* modifications in your CCS project and leave this file alone.              */
 /*                                                                           */
 /* --heap_size=0                                                             */
---stack_size=256
+/* --stack_size=256                                                          */
 /* --library=rtsv7M3_T_le_eabi.lib                                           */
 
 /* System memory map */
