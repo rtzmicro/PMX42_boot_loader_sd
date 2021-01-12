@@ -47,8 +47,8 @@
 #include "driverlib/ssi.h"
 #include "driverlib/sysctl.h"
 #include "bl_config.h"
-#include "boot_loader/bl_flash.h"
-#include "boot_loader/bl_hooks.h"
+#include "bootloader/bl_flash.h"
+#include "bootloader/bl_hooks.h"
 
 #define PIN_LOW     ( 0)
 #define PIN_HIGH    (~0)
@@ -75,10 +75,9 @@ static int count = 0;
 //
 //*****************************************************************************
 
-//void MyHwInitFunc(void)
-//{
-    //ROM_SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
-//}
+void MyHwInitFunc(void)
+{
+}
 
 //*****************************************************************************
 //
@@ -119,7 +118,8 @@ void MyInitFunc(void)
     // STAT_LED1(ACT) off
     ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_LOW);
     // STAT_LED2(ALM) on
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_HIGH);
+    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_LOW);
+
 }
 
 //*****************************************************************************
@@ -137,11 +137,16 @@ void MyInitFunc(void)
 void MyStartFunc(void)
 {
     int i;
-    // Blink ACT led
+    // Turn on STAT_LED2(ALM) on
+    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_LOW);
+
+#if 0
+    // Blink STAT_LED1(ACT)
     ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_HIGH);
-    for(i=0; i < 200000; i++);
+    for(i=0; i < 100000; i++);
     ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_LOW);
-    for(i=0; i < 200000; i++);
+    for(i=0; i < 100000; i++);
+#endif
 }
 
 //*****************************************************************************
@@ -189,7 +194,7 @@ void MyProgressFunc(uint32_t ulCompleted, uint32_t ulTotal)
 
 void MyEndFunc(void)
 {
-    // Status LED PF4 off
+    // Status both LED's off
     ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2|GPIO_PIN_3, PIN_LOW);
 }
 

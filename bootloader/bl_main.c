@@ -34,14 +34,14 @@
 #include "inc/hw_types.h"
 #include "inc/hw_uart.h"
 #include "bl_config.h"
-#include "boot_loader/bl_flash.h"
-#include "boot_loader/bl_hooks.h"
+#include "bootloader/bl_flash.h"
+#include "bootloader/bl_hooks.h"
+#include "bootloader/bl_ssi.h"
 #include "driverlib/gpio.h"
 #include "driverlib/pin_map.h"
+#include "driverlib/rom.h"
+#include "driverlib/rom_map.h"
 #include "driverlib/sysctl.h"
-#ifdef CHECK_CRC
-#include "boot_loader/bl_crc32.h"
-#endif
 
 #include "Petit/pff.h"
 #include "Petit/pffconf.h"
@@ -55,6 +55,9 @@
 BYTE bWriteBuffer[WRITE_DATA_PACKET_SIZE];
 
 FATFS fatfs;
+
+void BlinkGreen(int n);
+void BlinkRed(int n);
 
 //*****************************************************************************
 //
@@ -193,13 +196,10 @@ SwapWord(uint32_t x)
 //! \return None.
 //
 //*****************************************************************************
+
 void
 ConfigureDevice(void)
 {
-#ifdef UART_ENABLE_UPDATE
-    uint32_t ui32ProcRatio;
-#endif
-
 #ifdef CRYSTAL_FREQ
     //
     // Since the crystal frequency was specified, enable the main oscillator
@@ -251,6 +251,52 @@ ConfigureDevice(void)
                          SYSCTL_RCC_OSCSRC_MAIN);
 #endif
 #endif
+
+#ifdef SSI_ENABLE_UPDATE
+    //
+    // Enable the clocks to the SSI and GPIO modules.
+    //
+    HWREG(SYSCTL_RCGCGPIO) |= (SSI_CLKPIN_CLOCK_ENABLE |
+                               SSI_FSSPIN_CLOCK_ENABLE |
+                               SSI_MISOPIN_CLOCK_ENABLE |
+                               SSI_MOSIPIN_CLOCK_ENABLE);
+    HWREG(SYSCTL_RCGCSSI) |= SSI_CLOCK_ENABLE;
+
+    //
+    // Make the pin be peripheral controlled.
+    //
+    HWREG(SSI_CLKPIN_BASE + GPIO_O_AFSEL) |= SSI_CLK;
+    HWREG(SSI_CLKPIN_BASE + GPIO_O_PCTL) |= SSI_CLK_PCTL;
+    HWREG(SSI_CLKPIN_BASE + GPIO_O_DEN) |= SSI_CLK;
+    HWREG(SSI_CLKPIN_BASE + GPIO_O_ODR) &= ~(SSI_CLK);
+
+    HWREG(SSI_FSSPIN_BASE + GPIO_O_AFSEL) |= SSI_CS;
+    HWREG(SSI_FSSPIN_BASE + GPIO_O_PCTL) |= SSI_CS_PCTL;
+    HWREG(SSI_FSSPIN_BASE + GPIO_O_DEN) |= SSI_CS;
+    HWREG(SSI_FSSPIN_BASE + GPIO_O_ODR) &= ~(SSI_CS);
+
+    HWREG(SSI_MISOPIN_BASE + GPIO_O_AFSEL) |= SSI_TX;
+    HWREG(SSI_MISOPIN_BASE + GPIO_O_PCTL) |= SSI_TX_PCTL;
+    HWREG(SSI_MISOPIN_BASE + GPIO_O_DEN) |= SSI_TX;
+    HWREG(SSI_MISOPIN_BASE + GPIO_O_ODR) &= ~(SSI_TX);
+
+    HWREG(SSI_MOSIPIN_BASE + GPIO_O_AFSEL) |= SSI_RX;
+    HWREG(SSI_MOSIPIN_BASE + GPIO_O_PCTL) |= SSI_RX_PCTL;
+    HWREG(SSI_MOSIPIN_BASE + GPIO_O_DEN) |= SSI_RX;
+    HWREG(SSI_MOSIPIN_BASE + GPIO_O_ODR) &= ~(SSI_RX);
+
+    //
+    // Set the SSI protocol to Motorola with default clock high and data
+    // valid on the rising edge.
+    //
+    //HWREG(SSIx_BASE + SSI_O_CR0) = (SSI_CR0_SPH | SSI_CR0_FRF_MOTO | (DATA_BITS_SSI - 1));
+    HWREG(SSIx_BASE + SSI_O_CR0) = (SSI_CR0_FRF_MOTO | (DATA_BITS_SSI - 1));
+
+    //
+    // Enable the SSI interface in master mode.
+    //
+    HWREG(SSIx_BASE + SSI_O_CR1) = SSI_CR1_SSE;
+#endif
 }
 
 //*****************************************************************************
@@ -274,44 +320,41 @@ Updater(void)
     FRESULT rc;
     UINT br;
 
-    // Indicate start of mounting SD card
+    // Indicate start of update
 #ifdef BL_START_FN_HOOK
     BL_START_FN_HOOK();
 #endif
 
-    // try 10 times to mounting sd card. Blink led on every try.
+    //
+    // Try to mount the SD card
+    //
 
-    //rc = pf_mount(&fatfs);
-
+    // attempt to mount the SD file system
     j = 0;
 
-#if 0
-
     do {
-        // attempt to mount the SD file system
         rc = pf_mount(&fatfs);
-        // blink the LED
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-        for(i=0; i < 100000; i++);
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-        for(i=0; i < 100000; i++);
-        // Try up to ten times
+        BlinkGreen(1);
         j++;
     } while(rc && j < 10);
 
+    if (rc)
+        BlinkRed((int)rc);
+
+#if 0
     // if fail sd card mounting exit otherwise continue
     if (!rc)
     {
-        // try 10 times to opening app.bin file which in sd card(if exist). Blink led on every try.
+        // try 10 times to opening bootld.bin file which in sd card(if exist). Blink led on every try.
         j = 0;
 
         do {
             // attempt to open SD data file
             rc = pf_open(APP_FILE_NAME);
             // blink the LED
-            ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
+            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
             for(i=0; i < 100000; i++);
-            ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
+            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
             for(i=0; i < 100000; i++);
             // try again up to ten times
             j++;
@@ -320,6 +363,12 @@ Updater(void)
         // if fail app.bin file opening exit otherwise continue
         if (!rc)
         {
+            // DEBUG - BLINK STAT1 LED
+            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
+            //for(i=0; i < 200000; i++);
+            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
+            //for(i=0; i < 200000; i++);
+
             // if file size is not multiple of 4 exit otherwise continue
             if ((fatfs.fsize & 0x03) == 0)
             {
@@ -369,16 +418,17 @@ Updater(void)
                     AppAddress += 4;
                 }
 
+#if 0
                 // If done blink led 2 times with long delay.
                 ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-                for(i=0; i < 1000000; i++);
+                for(i=0; i < 2000000; i++);
                 ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-                for(i=0; i < 1000000; i++);
+                for(i=0; i < 2000000; i++);
                 ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-                for(i=0; i < 1000000; i++);
+                for(i=0; i < 2000000; i++);
                 ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-                for(i=0; i < 1000000; i++);
-
+                for(i=0; i < 2000000; i++);
+#endif
                 // Reset and disable the SSI peripheral that used by the boot loader.
                 ROM_SysCtlPeripheralDisable(SDC_SSI_SYSCTL_PERIPH);
                 ROM_SysCtlPeripheralReset(SDC_SSI_SYSCTL_PERIPH);
@@ -394,15 +444,32 @@ Updater(void)
                 // Reset and disable the GPIO peripheral that used by the boot loader.
                 //ROM_SysCtlPeripheralDisable(FORCED_UPDATE_PORT_SYSCTL_PERIPH);
                 //ROM_SysCtlPeripheralReset(FORCED_UPDATE_PORT_SYSCTL_PERIPH);
+
+
+                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOB);
+                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOE);
+                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOK);
             }
         }
     }
+#endif
+
+    // Indicate end of update
+#ifdef BL_END_FN_HOOK
+    BL_END_FN_HOOK();
+#endif
+
+    // Disable the SSI clock
+#ifdef SSI_ENABLE_UPDATE
+    HWREG(SYSCTL_RCGCSSI) &= ~SSI_CLOCK_ENABLE;
+    HWREG(SYSCTL_SRSSI) = SSI_CLOCK_ENABLE;
+    HWREG(SYSCTL_SRSSI) = 0;
+#endif
 
     // Branch to the specified address. This should never return.
     // If it does, very bad things will likely happen since it is
     // likely that the copy of the boot loader in SRAM will have
     // been overwritten.
-
     //((int (*)(void))APP_START_ADDRESS)();
 
     // Reset
@@ -414,7 +481,41 @@ Updater(void)
     while(1)
     {
     }
-#endif
+
+}
+
+//*****************************************************************************
+// DEBUG DIAGNOSTICS
+//*****************************************************************************
+
+void BlinkGreen(int n)
+{
+    int i;
+
+    // DEBUG - BLINK STAT1 LED
+
+    for (i=0; i < n; i++)
+    {
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_2, GPIO_PIN_2);
+        ROM_SysCtlDelay(1000000);
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_2, !GPIO_PIN_2);
+        ROM_SysCtlDelay(1000000);
+    }
+}
+
+void BlinkRed(int n)
+{
+    int i;
+
+    // DEBUG - BLINK STAT2 LED
+
+    for (i=0; i < n; i++)
+    {
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_3, GPIO_PIN_3);
+        ROM_SysCtlDelay(1500000);
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_3, !GPIO_PIN_3);
+        ROM_SysCtlDelay(1500000);
+    }
 }
 
 //*****************************************************************************

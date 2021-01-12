@@ -32,8 +32,15 @@
 #include "driverlib/rom_map.h"
 #include "driverlib/ssi.h"
 #include "driverlib/sysctl.h"
+#include "bl_config.h"
+#include "bootloader/bl_flash.h"
+#include "bootloader/bl_hooks.h"
+#include "bootloader/bl_ssi.h"
 #include "diskio.h"
 #include "petit/pffconf.h"
+
+extern void BlinkRed(int);
+extern void BlinkGreen(int);
 
 /*--------------------------------------------------------------------------
 
@@ -63,8 +70,10 @@
 static BYTE CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 
 
+#if 0
 void init_port(void)
 {
+
     /* Enable the peripherals used to drive the SDC on SSI */
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
@@ -98,6 +107,7 @@ void init_port(void)
     // Enable pin PK7 for CS_SD
     ROM_GPIOPinTypeGPIOOutput(GPIO_PORTK_BASE, GPIO_PIN_7);
 
+
     /*
      * Set the SSI output pins to 4MA drive strength and engage the
      * pull-up on the receive line.
@@ -124,13 +134,16 @@ void init_port(void)
                          GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
 
     /* Configure the SSI0 port */
-    ROM_SSIConfigSetExpClk(SSI1_BASE,
-                           120000000,
-                           SSI_FRF_MOTO_MODE_0,
-                           SSI_MODE_MASTER, 400000, 8);
+    //ROM_SSIConfigSetExpClk(SSI1_BASE,
+    //                       120000000,
+    //                       SSI_FRF_MOTO_MODE_0,
+    //                       SSI_MODE_MASTER, 400000, 8);
+
+    BlinkGreen(1);
 
     ROM_SSIEnable(SSI1_BASE);
 }
+#endif
 
 /*-----------------------------------------------------------------------*/
 /* Transmit a byte to the MMC (bitbanging)                               */
@@ -141,11 +154,7 @@ void xmit_mmc (
 	BYTE dat			/* Data to be sent */
 )
 {
-	 uint32_t ui32RcvDat;
-
-	 ROM_SSIDataPut(SDC_SSI_BASE, dat); /* Write the data to the tx fifo */
-
-	 ROM_SSIDataGet(SDC_SSI_BASE, &ui32RcvDat); /* flush data read during the write */
+	 SSISend(&dat, 1);
 }
 
 
@@ -157,13 +166,9 @@ void xmit_mmc (
 static
 BYTE rcvr_mmc (void)
 {
-	  uint32_t ui32RcvDat;
-
-    ROM_SSIDataPut(SDC_SSI_BASE, 0xFF); /* write dummy data */
-
-    ROM_SSIDataGet(SDC_SSI_BASE, &ui32RcvDat); /* read data frm rx fifo */
-
-    return (BYTE)ui32RcvDat;
+    BYTE dat;
+    SSIReceive(&dat, 1);
+    return dat;
 }
 
 
@@ -257,8 +262,8 @@ DSTATUS disk_initialize (void)
 	BYTE n, cmd, ty, buf[4];
 	UINT tmr;
 
+	//init_port();
 
-	init_port();
 	CS_H();
 	skip_mmc(10);			/* Dummy clocks */
 

@@ -760,6 +760,7 @@ FRESULT pf_mount (
 	if (disk_initialize() & STA_NOINIT)	/* Check if the drive is ready or not */
 		return FR_NOT_READY;
 
+
 	/* Search FAT partition on the drive */
 	bsect = 0;
 	fmt = check_fs(buf, bsect);			/* Check sector 0 as an SFD format */

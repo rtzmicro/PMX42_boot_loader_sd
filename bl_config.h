@@ -147,7 +147,7 @@
 // Requires: None
 //
 //*****************************************************************************
-#define STACK_SIZE              256
+#define STACK_SIZE              1024
 
 //*****************************************************************************
 //
@@ -366,5 +366,233 @@
 #define LED_GPIO_PORT_BASE      GPIO_PORTP_BASE
 #define LED_GPIO_SYSCTL_PERIPH  SYSCTL_PERIPH_GPIOP
 #define LED_PORT_PIN            GPIO_PIN_2
+
+/* PMX42 - HARDWARE REV-B
+ *
+ * Configure the appropriate pins to be SSI instead of GPIO. The FSS (CS)
+ * signal is directly driven to ensure that we can hold it low through a
+ * complete transaction with the SD card. For the PMX42, the SD drive
+ * is wired to the following I/O's for SSI1:
+ *
+ *  PK7 -> CS_SD     (CS_N)
+ *  PB5 -> SSI1CLK   (SCK)
+ *  PE4 -> SSI1XDAT0 (MOSI)
+ *  PE5 -> SSI1XDAT1 (MISO)
+ */
+
+//*****************************************************************************
+//
+// Selects the SSI port as the port for communicating with the boot loader.
+//
+// Depends on: None
+// Exclusive of: CAN_ENABLE_UPDATE, ENET_ENABLE_UPDATE, I2C_ENABLE_UPDATE,
+//               UART_ENABLE_UPDATE, USB_ENABLE_UPDATE
+// Requires: SSI_CLOCK_ENABLE, SSIx_BASE, SSI_CLKPIN_CLOCK_ENABLE,
+//           SSI_CLKPIN_BASE, SSI_CLKPIN_PCTL, SSI_CLKPIN_POS,
+//           SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE, SSI_FSSPIN_PCTL,
+//           SSI_FSSPIN_POS, SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE,
+//           SSI_MISOPIN_PCTL, SSI_MISOPIN_POS, SSI_MOSIPIN_CLOCK_ENABLE,
+//           SSI_MOSIPIN_BASE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
+//
+//*****************************************************************************
+#define SSI_ENABLE_UPDATE
+
+//*****************************************************************************
+//
+// Selects the clock enable for the SSI peripheral module
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSIx_BASE
+//
+//*****************************************************************************
+#define SSI_CLOCK_ENABLE        SYSCTL_RCGCSSI_R1   /* SSI1 */
+
+//*****************************************************************************
+//
+// Selects the base address of the SSI peripheral module
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_CLOCK_ENABLE
+//
+//*****************************************************************************
+#define SSIx_BASE               SSI1_BASE
+
+//*****************************************************************************
+//
+// Selects the clock enable for the GPIO corresponding to SSI CLK pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_CLKPIN_BASE, SSI_CLKPIN_PCTL and SSI_CLKPIN_POS
+//
+//*****************************************************************************
+#define SSI_CLKPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R1      /* PB5 */
+
+//*****************************************************************************
+//
+// Selects the base address for the GPIO corresponding to SSI CLK pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_PCTL and SSI_CLKPIN_POS
+//
+//*****************************************************************************
+#define SSI_CLKPIN_BASE         GPIO_PORTB_BASE         /* PB5 */
+
+//*****************************************************************************
+//
+// Selects the port control value for the GPIO corresponding to SSI CLK pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_BASE and SSI_CLKPIN_POS
+//
+//*****************************************************************************
+//#define SSI_CLKPIN_PCTL          0x2
+
+//*****************************************************************************
+//
+// Selects the pin number for the GPIO corresponding to SSI CLK pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_BASE and SSI_CLKPIN_PCTL
+//
+//*****************************************************************************
+#define SSI_CLKPIN_POS          5                       /* PB5 */
+
+//*****************************************************************************
+//
+// Selects the clock enable for the GPIO corresponding to SSI FSS pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_FSSPIN_BASE, SSI_FSSPIN_PCTL and SSI_FSSPIN_POS
+//
+//*****************************************************************************
+#define SSI_FSSPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R9      /* PK7 */
+
+//*****************************************************************************
+//
+// Selects the base address for the GPIO corresponding to SSI FSS pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_PCTL and SSI_FSSPIN_POS
+//
+//*****************************************************************************
+#define SSI_FSSPIN_BASE         GPIO_PORTK_BASE         /* PK7 */
+
+//*****************************************************************************
+//
+// Selects the port control value for the GPIO corresponding to SSI FSS pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE and SSI_FSSPIN_POS
+//
+//*****************************************************************************
+//#define SSI_FSSPIN_PCTL          0x2
+
+//*****************************************************************************
+//
+// Selects the pin number for the GPIO corresponding to SSI FSS pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE and SSI_FSSPIN_PCTL
+//
+//*****************************************************************************
+#define SSI_FSSPIN_POS          7                       /* PK7 */
+
+//*****************************************************************************
+//
+// Selects the clock enable for the GPIO corresponding to SSI MISO pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MISOPIN_BASE, SSI_MISOPIN_PCTL and SSI_MISOPIN_POS
+//
+//*****************************************************************************
+#define SSI_MISOPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R4     /* PE5 */
+
+//*****************************************************************************
+//
+// Selects the base address for the GPIO corresponding to SSI MISO pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_PCTL and SSI_MISOPIN_POS
+//
+//*****************************************************************************
+#define SSI_MISOPIN_BASE        GPIO_PORTE_BASE          /* PE5 */
+
+//*****************************************************************************
+//
+// Selects the port control value for the GPIO corresponding to SSI MISO pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE and SSI_MISOPIN_POS
+//
+//*****************************************************************************
+//#define SSI_MISOPIN_PCTL         0x2
+
+//*****************************************************************************
+//
+// Selects the pin number for the GPIO corresponding to SSI MISO pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE and SSI_MISOPIN_PCTL
+//
+//*****************************************************************************
+#define SSI_MISOPIN_POS         5                       /* PE5 */
+
+//*****************************************************************************
+//
+// Selects the clock enable for the GPIO corresponding to SSI MOSI pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MOSIPIN_BASE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
+//
+//*****************************************************************************
+#define SSI_MOSIPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R4     /* PE4 */
+
+//*****************************************************************************
+//
+// Selects the base address for the GPIO corresponding to SSI MOSI pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
+//
+//*****************************************************************************
+#define SSI_MOSIPIN_BASE        GPIO_PORTE_BASE         /* PE4 */
+
+//*****************************************************************************
+//
+// Selects the port control value for the GPIO corresponding to SSI MOSI pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_BASE and SSI_MOSIPIN_POS
+//
+//*****************************************************************************
+//#define SSI_MOSIPIN_PCTL         0x2
+
+//*****************************************************************************
+//
+// Selects the pin number for the GPIO corresponding to SSI MOSI pin
+//
+// Depends on: SSI_ENABLE_UPDATE
+// Exclusive of: None
+// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_BASE and SSI_MOSIPIN_PCTL
+//
+//*****************************************************************************
+#define SSI_MOSIPIN_POS         4                       /* PE4 */
 
 #endif // __BL_CONFIG_H__
