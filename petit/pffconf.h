@@ -5,30 +5,12 @@
 #ifndef _PFFCONF
 #define _PFFCONF 4004	/* Revision ID */
 
-/*-------------------------------------------------------------------------*/
-/* Platform dependent macros and functions needed to be modified           */
-/*-------------------------------------------------------------------------*/
-
-
 #define DLY_US(n)	ROM_SysCtlDelay((120000000/3000000)*n);	// Delay n microseconds
 #define	FORWARD(d)	forward(d)	/* Data in-time processing function (depends on the project) */
 
-#define	CS_H()		ROM_GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, GPIO_PIN_7)
-#define CS_L()		ROM_GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, 0);
-
-/* Peripheral definitions for DK-TM4C123G board */
-// SSI port
-#define SDC_SSI_BASE            SSI1_BASE
-#define SDC_SSI_SYSCTL_PERIPH   SYSCTL_PERIPH_SSI1
-
-// GPIO for SSI pins
-//#define SDC_GPIO_PORT_BASE      GPIO_PORTA_BASE
-//#define SDC_GPIO_SYSCTL_PERIPH  SYSCTL_PERIPH_GPIOA
-//#define SDC_SSI_CLK             GPIO_PIN_2
-//#define SDC_SSI_TX              GPIO_PIN_5
-//#define SDC_SSI_RX              GPIO_PIN_4
-//#define SDC_SSI_FSS             GPIO_PIN_3
-//#define SDC_SSI_PINS            (SDC_SSI_TX | SDC_SSI_RX | SDC_SSI_CLK | SDC_SSI_FSS)
+/* SD drive chip select */
+#define CS_H()      HWREG(SSI_FSSPIN_BASE + (GPIO_O_DATA + (SSI_FSSPIN_POS << 2))) = SSI_FSSPIN_POS
+#define CS_L()      HWREG(SSI_FSSPIN_BASE + (GPIO_O_DATA + (SSI_FSSPIN_POS << 2))) = 0
 
 /*---------------------------------------------------------------------------/
 / Function Configurations
@@ -40,7 +22,7 @@
 #define	_USE_WRITE	1	/* Enable pf_write() function */
 
 #define _FS_FAT12	0	/* Enable FAT12 */
-#define _FS_FAT16	0	/* Enable FAT16 */
+#define _FS_FAT16	1	/* Enable FAT16 */
 #define _FS_FAT32	1	/* Enable FAT32 */
 
 

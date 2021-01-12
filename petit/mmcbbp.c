@@ -49,101 +49,27 @@ extern void BlinkGreen(int);
 ---------------------------------------------------------------------------*/
 
 /* Definitions for MMC/SDC command */
-#define CMD0	(0x40+0)	/* GO_IDLE_STATE */
-#define CMD1	(0x40+1)	/* SEND_OP_COND (MMC) */
-#define	ACMD41	(0xC0+41)	/* SEND_OP_COND (SDC) */
-#define CMD8	(0x40+8)	/* SEND_IF_COND */
-#define CMD16	(0x40+16)	/* SET_BLOCKLEN */
-#define CMD17	(0x40+17)	/* READ_SINGLE_BLOCK */
-#define CMD24	(0x40+24)	/* WRITE_BLOCK */
-#define CMD55	(0x40+55)	/* APP_CMD */
-#define CMD58	(0x40+58)	/* READ_OCR */
+#define CMD0	    (0x40+0)	        /* GO_IDLE_STATE      */
+#define CMD1	    (0x40+1)	        /* SEND_OP_COND (MMC) */
+#define	ACMD41	    (0xC0+41)	        /* SEND_OP_COND (SDC) */
+#define CMD8	    (0x40+8)	        /* SEND_IF_COND       */
+#define CMD16	    (0x40+16)	        /* SET_BLOCKLEN       */
+#define CMD17	    (0x40+17)	        /* READ_SINGLE_BLOCK  */
+#define CMD24	    (0x40+24)	        /* WRITE_BLOCK        */
+#define CMD55	    (0x40+55)	        /* APP_CMD            */
+#define CMD58	    (0x40+58)	        /* READ_OCR           */
 
 /* Card type flags (CardType) */
-#define CT_MMC				0x01	/* MMC ver 3 */
-#define CT_SD1				0x02	/* SD ver 1 */
-#define CT_SD2				0x04	/* SD ver 2 */
-#define CT_SDC				(CT_SD1|CT_SD2)	/* SD */
-#define CT_BLOCK			0x08	/* Block addressing */
+#define CT_MMC		0x01	            /* MMC ver 3          */
+#define CT_SD1		0x02	            /* SD ver 1           */
+#define CT_SD2		0x04	            /* SD ver 2           */
+#define CT_SDC		(CT_SD1|CT_SD2)	    /* SD                 */
+#define CT_BLOCK	0x08	            /* Block addressing   */
+
+/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
+static BYTE CardType;
 
 
-static BYTE CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
-
-
-#if 0
-void init_port(void)
-{
-
-    /* Enable the peripherals used to drive the SDC on SSI */
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOK);
-
-    /* Configure the appropriate pins to be SSI instead of GPIO. The FSS (CS)
-     * signal is directly driven to ensure that we can hold it low through a
-     * complete transaction with the SD card. For the PMX42, the SD drive
-     * is wired to the following I/O's for SSI1:
-     *
-     *  PK7 -> CS_SD     (CS_N)
-     *  PB5 -> SSI1CLK   (SCK)
-     *  PE4 -> SSI1XDAT0 (MOSI)
-     *  PE5 -> SSI1XDAT1 (MISO)
-     */
-
-    /* SSI-1 Configure Pins (must be done first!) */
-
-    // Enable pin PE5 for SSI1 SSI1XDAT1
-    ROM_GPIOPinConfigure(GPIO_PE5_SSI1XDAT1);
-    ROM_GPIOPinTypeSSI(GPIO_PORTE_BASE, GPIO_PIN_5);
-
-    // Enable pin PE4 for SSI1 SSI1XDAT0
-    ROM_GPIOPinConfigure(GPIO_PE4_SSI1XDAT0);
-    ROM_GPIOPinTypeSSI(GPIO_PORTE_BASE, GPIO_PIN_4);
-
-    // Enable pin PB5 for SSI1 SSI1CLK
-    ROM_GPIOPinConfigure(GPIO_PB5_SSI1CLK);
-    ROM_GPIOPinTypeSSI(GPIO_PORTB_BASE, GPIO_PIN_5);
-
-    // Enable pin PK7 for CS_SD
-    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTK_BASE, GPIO_PIN_7);
-
-
-    /*
-     * Set the SSI output pins to 4MA drive strength and engage the
-     * pull-up on the receive line.
-     */
-
-    /* CS_SD(PK7) SS */
-    MAP_GPIOPadConfigSet(GPIO_PORTK_BASE,
-                         GPIO_PIN_7,
-                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
-
-    /* SSI1CLK(PB5) SCK */
-    MAP_GPIOPadConfigSet(GPIO_PORTB_BASE,
-                         GPIO_PIN_5,
-                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
-
-    /* SSI1XDAT0(PE4) MOSI */
-    MAP_GPIOPadConfigSet(GPIO_PORTE_BASE,
-                         GPIO_PIN_4,
-                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
-
-    /* SSI1XDAT1(PE5) MISO */
-    MAP_GPIOPadConfigSet(GPIO_PORTE_BASE,
-                         GPIO_PIN_5,
-                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
-
-    /* Configure the SSI0 port */
-    //ROM_SSIConfigSetExpClk(SSI1_BASE,
-    //                       120000000,
-    //                       SSI_FRF_MOTO_MODE_0,
-    //                       SSI_MODE_MASTER, 400000, 8);
-
-    BlinkGreen(1);
-
-    ROM_SSIEnable(SSI1_BASE);
-}
-#endif
 
 /*-----------------------------------------------------------------------*/
 /* Transmit a byte to the MMC (bitbanging)                               */

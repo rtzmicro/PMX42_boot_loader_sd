@@ -39,6 +39,7 @@
 #include "bootloader/bl_ssi.h"
 #include "driverlib/gpio.h"
 #include "driverlib/pin_map.h"
+#include "driverlib/ssi.h"
 #include "driverlib/rom.h"
 #include "driverlib/rom_map.h"
 #include "driverlib/sysctl.h"
@@ -52,12 +53,14 @@
 
 #define WRITE_DATA_PACKET_SIZE  128
 
-BYTE bWriteBuffer[WRITE_DATA_PACKET_SIZE];
+static BYTE bWriteBuffer[WRITE_DATA_PACKET_SIZE];
+static FATFS fatfs;
 
-FATFS fatfs;
-
-void BlinkGreen(int n);
-void BlinkRed(int n);
+// Helper Functions
+static void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
+                         uint32_t ui32BitRate, uint32_t ui32DataWidth);
+static void BlinkGreen(int n);
+static void BlinkRed(int n);
 
 //*****************************************************************************
 //
@@ -252,7 +255,11 @@ ConfigureDevice(void)
 #endif
 #endif
 
-#ifdef SSI_ENABLE_UPDATE
+    //
+    // Enable SD SSI peripheral
+    //
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI1);
+
     //
     // Enable the clocks to the SSI and GPIO modules.
     //
@@ -285,18 +292,59 @@ ConfigureDevice(void)
     HWREG(SSI_MOSIPIN_BASE + GPIO_O_DEN) |= SSI_RX;
     HWREG(SSI_MOSIPIN_BASE + GPIO_O_ODR) &= ~(SSI_RX);
 
-    //
-    // Set the SSI protocol to Motorola with default clock high and data
-    // valid on the rising edge.
-    //
-    //HWREG(SSIx_BASE + SSI_O_CR0) = (SSI_CR0_SPH | SSI_CR0_FRF_MOTO | (DATA_BITS_SSI - 1));
-    HWREG(SSIx_BASE + SSI_O_CR0) = (SSI_CR0_FRF_MOTO | (DATA_BITS_SSI - 1));
+    // Set the SSI protocol to Motorola with default
+    // clock high and data valid on the rising edge.
+    // Motorola Mode 0 (CPOL=0 and CPHA=0)
+    // SSU clock 100kHz
 
-    //
-    // Enable the SSI interface in master mode.
-    //
-    HWREG(SSIx_BASE + SSI_O_CR1) = SSI_CR1_SSE;
-#endif
+    ConfigureSSI(SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 100000, 8);
+
+    // Enable the synchronous serial interface.
+
+    HWREG(SSIx_BASE + SSI_O_CR1) |= SSI_CR1_SSE;
+}
+
+//*****************************************************************************
+//
+//! Configure the SSI port the SPI for the SD interface in SPI mode.
+//!
+//
+//*****************************************************************************
+
+void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
+                  uint32_t ui32BitRate, uint32_t ui32DataWidth)
+{
+    uint32_t ui32MaxBitRate;
+    uint32_t ui32RegVal;
+    uint32_t ui32PreDiv;
+    uint32_t ui32SCR;
+    uint32_t ui32SPH_SPO;
+
+    uint32_t ui32SSIClk = 120000000;
+
+    // Set the mode.
+    ui32RegVal = (ui32Mode == SSI_MODE_MASTER) ? 0 : SSI_CR1_MS;
+    HWREG(SSIx_BASE + SSI_O_CR1) = ui32RegVal;
+
+
+    // Set the clock predivider.
+    ui32MaxBitRate = ui32SSIClk / ui32BitRate;
+    ui32PreDiv = 0;
+    do
+    {
+        ui32PreDiv += 2;
+        ui32SCR = (ui32MaxBitRate / ui32PreDiv) - 1;
+    }
+    while(ui32SCR > 255);
+    HWREG(SSIx_BASE + SSI_O_CPSR) = ui32PreDiv;
+
+    // Set protocol and clock rate.
+    ui32SPH_SPO = (ui32Protocol & 3) << 6;
+    ui32Protocol &= SSI_CR0_FRF_M;
+
+    ui32RegVal = (ui32SCR << 8) | ui32SPH_SPO | ui32Protocol | (ui32DataWidth - 1);
+
+    HWREG(SSIx_BASE + SSI_O_CR0) = ui32RegVal;
 }
 
 //*****************************************************************************
@@ -339,7 +387,10 @@ Updater(void)
     } while(rc && j < 10);
 
     if (rc)
+    {
+        // Error mounting the SD card
         BlinkRed((int)rc);
+    }
 
 #if 0
     // if fail sd card mounting exit otherwise continue
@@ -352,10 +403,7 @@ Updater(void)
             // attempt to open SD data file
             rc = pf_open(APP_FILE_NAME);
             // blink the LED
-            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-            for(i=0; i < 100000; i++);
-            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-            for(i=0; i < 100000; i++);
+            BlinkGreen(1);
             // try again up to ten times
             j++;
         } while(rc && j < 10);
