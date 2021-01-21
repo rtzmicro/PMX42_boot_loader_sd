@@ -47,9 +47,11 @@
 #include "Petit/pff.h"
 #include "Petit/pffconf.h"
 
+//*****************************************************************************
 // Specifies how many bytes read from file to write flash at one time
 // if higher increase ram size decrease program load time
 // else decrease ram size increase program load time
+//*****************************************************************************
 
 #define WRITE_DATA_PACKET_SIZE  128
 
@@ -102,58 +104,6 @@ extern void CallApplication(uint32_t ui32Base);
 //
 //*****************************************************************************
 extern void Delay(uint32_t ui32Count);
-
-//*****************************************************************************
-//
-// Holds the current status of the last command that was issued to the boot
-// loader.
-//
-//*****************************************************************************
-uint8_t g_ui8Status;
-
-//*****************************************************************************
-//
-// This holds the current remaining size in bytes to be downloaded.
-//
-//*****************************************************************************
-uint32_t g_ui32TransferSize;
-
-//*****************************************************************************
-//
-// This holds the total size of the firmware image being downloaded (if the
-// protocol in use provides this).
-//
-//*****************************************************************************
-#if (defined BL_PROGRESS_FN_HOOK) || (defined CHECK_CRC)
-uint32_t g_ui32ImageSize;
-#endif
-
-//*****************************************************************************
-//
-// This holds the current address that is being written to during a download
-// command.
-//
-//*****************************************************************************
-uint32_t g_ui32TransferAddress;
-#ifdef CHECK_CRC
-uint32_t g_ui32ImageAddress;
-#endif
-
-//*****************************************************************************
-//
-// This is the data buffer used during transfers to the boot loader.
-//
-//*****************************************************************************
-uint32_t g_pui32DataBuffer[BUFFER_SIZE];
-
-//*****************************************************************************
-//
-// This is an specially aligned buffer pointer to g_pui32DataBuffer to make
-// copying to the buffer simpler.  It must be offset to end on an address that
-// ends with 3.
-//
-//*****************************************************************************
-uint8_t *g_pui8DataBuffer;
 
 //*****************************************************************************
 //
@@ -326,7 +276,6 @@ void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
     ui32RegVal = (ui32Mode == SSI_MODE_MASTER) ? 0 : SSI_CR1_MS;
     HWREG(SSIx_BASE + SSI_O_CR1) = ui32RegVal;
 
-
     // Set the clock predivider.
     ui32MaxBitRate = ui32SSIClk / ui32BitRate;
     ui32PreDiv = 0;
@@ -377,13 +326,19 @@ Updater(void)
     // Try to mount the SD card
     //
 
-    // attempt to mount the SD file system
     j = 0;
+
+    // Attempt to mount the SD file system 10 times.
 
     do {
         rc = pf_mount(&fatfs);
+
+        // blink the led each attempt
         BlinkGreen(1);
+
+        // try again up to ten times
         j++;
+
     } while(rc && j < 10);
 
     if (rc)
@@ -391,32 +346,30 @@ Updater(void)
         // Error mounting the SD card
         BlinkRed((int)rc);
     }
-
-#if 0
-    // if fail sd card mounting exit otherwise continue
-    if (!rc)
+    else
     {
-        // try 10 times to opening bootld.bin file which in sd card(if exist). Blink led on every try.
         j = 0;
+
+        // The SD card was mounted successfully, now try 10
+        // times opening bootld.bin file which is on the SD
+        // card (if exist). Blink led on every try.
 
         do {
             // attempt to open SD data file
             rc = pf_open(APP_FILE_NAME);
-            // blink the LED
+
+            // blink the LED each attempt
             BlinkGreen(1);
+
             // try again up to ten times
             j++;
+
         } while(rc && j < 10);
 
-        // if fail app.bin file opening exit otherwise continue
+        // Continue if we opened the image file successfully, otherwise exit.
+
         if (!rc)
         {
-            // DEBUG - BLINK STAT1 LED
-            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-            //for(i=0; i < 200000; i++);
-            //ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-            //for(i=0; i < 200000; i++);
-
             // if file size is not multiple of 4 exit otherwise continue
             if ((fatfs.fsize & 0x03) == 0)
             {
@@ -435,7 +388,9 @@ Updater(void)
                     AppAddress += FLASH_PAGE_SIZE;
                 }
 
-                AppAddress = APP_START_ADDRESS;         // Set app address to write
+                // Set app address to write
+                AppAddress = APP_START_ADDRESS;
+
                 // Calculate packet count according to write data packet size that user defined
                 WriteDataPacketCount = fatfs.fsize / WRITE_DATA_PACKET_SIZE;
 
@@ -452,6 +407,10 @@ Updater(void)
                     ROM_FlashProgram((uint32_t*)bWriteBuffer, AppAddress, WRITE_DATA_PACKET_SIZE);
 
                     AppAddress += WRITE_DATA_PACKET_SIZE;
+
+#ifdef BL_PROGRESS_FN_HOOK
+                    BL_PROGRESS_FN_HOOK(AppAddress - APP_START_ADDRESS, WriteDataPacketCount);
+#endif
                 }
 
                 // Read 4 bytes from app.bin file and
@@ -466,41 +425,29 @@ Updater(void)
                     AppAddress += 4;
                 }
 
-#if 0
                 // If done blink led 2 times with long delay.
-                ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-                for(i=0; i < 2000000; i++);
-                ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-                for(i=0; i < 2000000; i++);
-                ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, LED_PORT_PIN);
-                for(i=0; i < 2000000; i++);
-                ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_PORT_PIN, !LED_PORT_PIN);
-                for(i=0; i < 2000000; i++);
-#endif
-                // Reset and disable the SSI peripheral that used by the boot loader.
-                ROM_SysCtlPeripheralDisable(SDC_SSI_SYSCTL_PERIPH);
-                ROM_SysCtlPeripheralReset(SDC_SSI_SYSCTL_PERIPH);
-
-                // Reset and disable the GPIO peripheral that used by the boot loader.
-                //ROM_SysCtlPeripheralDisable(SDC_GPIO_SYSCTL_PERIPH);
-                //ROM_SysCtlPeripheralReset(SDC_GPIO_SYSCTL_PERIPH);
-
-                // Reset and disable the GPIO peripheral that used by the boot loader.
-                ROM_SysCtlPeripheralDisable(LED_GPIO_SYSCTL_PERIPH);
-                ROM_SysCtlPeripheralReset(LED_GPIO_SYSCTL_PERIPH);
-
-                // Reset and disable the GPIO peripheral that used by the boot loader.
-                //ROM_SysCtlPeripheralDisable(FORCED_UPDATE_PORT_SYSCTL_PERIPH);
-                //ROM_SysCtlPeripheralReset(FORCED_UPDATE_PORT_SYSCTL_PERIPH);
-
-
-                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOB);
-                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOE);
-                ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOK);
+                BlinkGreen(2);
             }
         }
     }
-#endif
+
+    // Reset and disable the SSI peripheral that used by the boot loader.
+    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_SSI1);
+    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_SSI1);
+
+    // Reset and disable the GPIO peripheral that used by the boot loader.
+    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOB);
+    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOB);
+
+    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOK);
+    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOK);
+
+    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOE);
+    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOE);
+
+    // Reset and disable the GPIO peripheral that used by the boot loader.
+    ROM_SysCtlPeripheralDisable(LED_GPIO_SYSCTL_PERIPH);
+    ROM_SysCtlPeripheralReset(LED_GPIO_SYSCTL_PERIPH);
 
     // Indicate end of update
 #ifdef BL_END_FN_HOOK
@@ -529,7 +476,6 @@ Updater(void)
     while(1)
     {
     }
-
 }
 
 //*****************************************************************************

@@ -136,17 +136,8 @@ void MyInitFunc(void)
 
 void MyStartFunc(void)
 {
-    int i;
     // Turn on STAT_LED2(ALM) on
     ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_LOW);
-
-#if 0
-    // Blink STAT_LED1(ACT)
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_HIGH);
-    for(i=0; i < 100000; i++);
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_LOW);
-    for(i=0; i < 100000; i++);
-#endif
 }
 
 //*****************************************************************************
