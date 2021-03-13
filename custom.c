@@ -50,11 +50,22 @@
 #include "bootloader/bl_flash.h"
 #include "bootloader/bl_hooks.h"
 
+//
+// These define the PMX42 LED's that are used to blink during the bootloader
+// update process. These are the alarm (ALM) and activity (ACT) LED's.
+//
+
+#define LED_GPIO_SYSCTL_PERIPH  SYSCTL_PERIPH_GPIOP
+#define LED_GPIO_PORT_BASE      GPIO_PORTP_BASE         // STAT LED port base
+#define LED_ACT_PIN             GPIO_PIN_2              // PP2 - LED_STAT1 (ACT)
+#define LED_ALM_PIN             GPIO_PIN_3              // PP3 - LED_STAT2 (ALM)
+
 #define PIN_LOW     ( 0)
 #define PIN_HIGH    (~0)
 
-/*** Static Function Prototypes ***/
-
+/*** Static Function Prototypes */
+static void BlinkRed(int n);
+static void BlinkGreen(int n);
 
 /*** Global Data ***/
 static int count = 0;
@@ -110,21 +121,35 @@ void MyHwInitFunc(void)
 void MyInitFunc(void)
 {
     // Enable Port-P peripheral
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOP);
-
+    ROM_SysCtlPeripheralEnable(LED_GPIO_SYSCTL_PERIPH);
     // Enable pins PP2 & PP3 for GPIOOutput
-    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTP_BASE, GPIO_PIN_2|GPIO_PIN_3);
-
+    ROM_GPIOPinTypeGPIOOutput(LED_GPIO_PORT_BASE, GPIO_PIN_2|GPIO_PIN_3);
     // STAT_LED1(ACT) off
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, PIN_LOW);
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN, PIN_LOW);
     // STAT_LED2(ALM) on
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_LOW);
-
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_3, PIN_LOW);
 }
 
 //*****************************************************************************
 //
-// Informs an application that a download is starting.
+// Performs application-specific cleanup before the bootloader exits.
+//
+// This function will be called just prior to jumping to the application.
+//
+// void MyExitFunc(void);
+//
+//*****************************************************************************
+
+void MyExitFunc(void)
+{
+    // Reset and disable the GPIO peripherals used by the boot loader.
+    ROM_SysCtlPeripheralDisable(LED_GPIO_SYSCTL_PERIPH);
+    ROM_SysCtlPeripheralReset(LED_GPIO_SYSCTL_PERIPH);
+}
+
+//*****************************************************************************
+//
+// Informs an application that a firmware update is starting.
 //
 // If hooked, this function will be called when a new firmware download is
 // about to start.  The application may use this signal to initialize any
@@ -136,8 +161,122 @@ void MyInitFunc(void)
 
 void MyStartFunc(void)
 {
-    // Turn on STAT_LED2(ALM) on
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_3, PIN_LOW);
+    // Turn on STAT_LED1(ACT)
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN, PIN_LOW);
+    // Turn off STAT_LED2(ALM)
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ALM_PIN, PIN_LOW);
+
+#if (ENABLE_UART_CONSOLE == 1)
+    UARTPuts("\nBootloader starting\n");
+#endif
+    BlinkGreen(1);
+}
+
+//*****************************************************************************
+//
+// Indicates the firmware flash process has begun
+//
+// If hooked, this function will be called when the firmware image file
+// is opened on the SD drive. If an error occurs, the error code is passed.
+//
+// void MyOpenFunc(void);
+//
+//*****************************************************************************
+
+void MyMountFunc(uint32_t error)
+{
+    if (error)
+    {
+#if (ENABLE_UART_CONSOLE == 1)
+        UARTprintf("Error %d : mounting SD drive\n", error);
+#endif
+        // Error mounting the SD card
+        BlinkRed((int)error);
+    }
+    else
+    {
+#if (ENABLE_UART_CONSOLE == 1)
+        UARTprintf("Mounting SD drive\n");
+#endif
+        // Error mounting the SD card
+        BlinkGreen(1);
+    }
+}
+
+//*****************************************************************************
+//
+// Indicates the firmware flash process has begun
+//
+// If hooked, this function will be called when the firmware image file
+// is opened on the SD drive. If an error occurs, the error code is passed.
+//
+// void MyOpenFunc(void);
+//
+//*****************************************************************************
+
+void MyOpenFunc(uint32_t error)
+{
+    if (error)
+    {
+#if (ENABLE_UART_CONSOLE == 1)
+        UARTprintf("Error %d : opening image\n", error);
+#endif
+        BlinkRed((int)error);
+    }
+    else
+    {
+        // blink the LED
+        BlinkGreen(1);
+#if (ENABLE_UART_CONSOLE == 1)
+        UARTprintf("Opening image: %s\n", IMAGE_FILE_NAME);
+#endif
+    }
+}
+
+//*****************************************************************************
+//
+// Indicates the firmware flash process has begun
+//
+// If hooked, this function will be called when a firmware download ends.
+// The application may use this signal to update its user interface.  Typically
+// a system reset will occur shortly after this function returns as the boot
+// loader attempts to boot the new image.
+//
+// void MyEndFunc(void);
+//
+//*****************************************************************************
+
+void MyBeginFunc(void)
+{
+    // Turn on STAT_LED2(ALM) while flashing
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ALM_PIN, PIN_HIGH);
+
+#if (ENABLE_UART_CONSOLE == 1)
+    UARTprintf("Flashing image\n");
+#endif
+}
+
+//*****************************************************************************
+//
+// Indicates the firmware flash has successfully completed
+//
+// If hooked, this function will be called when a firmware download ends.
+// The application may use this signal to update its user interface.  Typically
+// a system reset will occur shortly after this function returns as the boot
+// loader attempts to boot the new image.
+//
+// void MyEndFunc(void);
+//
+//*****************************************************************************
+
+void MyEndFunc(void)
+{
+    // Status both LED's off
+    ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN|LED_ALM_PIN, PIN_LOW);
+
+#if (ENABLE_UART_CONSOLE == 1)
+    UARTprintf("\nFlash complete\n");
+#endif
 }
 
 //*****************************************************************************
@@ -164,29 +303,49 @@ void MyProgressFunc(uint32_t ulCompleted, uint32_t ulTotal)
     if (++count >= 1)
     {
         count = 0;
+
+#if (ENABLE_UART_CONSOLE == 1)
+        UARTPutch('.');
+#endif
         // Toggle status LED on PP2
-        uint32_t pin = ROM_GPIOPinRead(GPIO_PORTP_BASE, GPIO_PIN_2) ? PIN_LOW : PIN_HIGH;
-        ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2, pin);
+        uint32_t pin = ROM_GPIOPinRead(LED_GPIO_PORT_BASE, LED_ACT_PIN) ? PIN_LOW : PIN_HIGH;
+
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN, pin);
     }
 }
 
 //*****************************************************************************
-//
-// Informs an application that a download has completed.
-//
-// If hooked, this function will be called when a firmware download ends.
-// The application may use this signal to update its user interface.  Typically
-// a system reset will occur shortly after this function returns as the boot
-// loader attempts to boot the new image.
-//
-// void MyEndFunc(void);
-//
+// Helper Functions to blink status LED's
 //*****************************************************************************
 
-void MyEndFunc(void)
+void BlinkGreen(int n)
 {
-    // Status both LED's off
-    ROM_GPIOPinWrite(GPIO_PORTP_BASE, GPIO_PIN_2|GPIO_PIN_3, PIN_LOW);
+    int i;
+
+    // DEBUG - BLINK STAT1 LED
+
+    for (i=0; i < n; i++)
+    {
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN, LED_ACT_PIN);
+        ROM_SysCtlDelay(2000000);
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ACT_PIN, !LED_ACT_PIN);
+        ROM_SysCtlDelay(2000000);
+    }
+}
+
+void BlinkRed(int n)
+{
+    int i;
+
+    // DEBUG - BLINK STAT2 LED
+
+    for (i=0; i < n; i++)
+    {
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ALM_PIN, LED_ALM_PIN);
+        ROM_SysCtlDelay(3000000);
+        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, LED_ALM_PIN, !LED_ALM_PIN);
+        ROM_SysCtlDelay(3000000);
+    }
 }
 
 // END-OF-FILE

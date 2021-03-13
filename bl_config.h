@@ -190,7 +190,7 @@
 // Requries: None
 //
 //*****************************************************************************
-#define FORCED_UPDATE_PERIPH    SYSCTL_RCGCGPIO_R12		/* Port-N */
+#define FORCED_UPDATE_PERIPH    SYSCTL_RCGCGPIO_R12     /* Port-N */
 
 //*****************************************************************************
 //
@@ -215,7 +215,7 @@
 // Requries: None
 //
 //*****************************************************************************
-#define FORCED_UPDATE_PIN       0     // PN0 connected to BTN_SWITCH1
+#define FORCED_UPDATE_PIN       0     // PN0 connected to BTN_SWITCH1 (UP)
 
 //*****************************************************************************
 //
@@ -328,6 +328,52 @@
 
 //*****************************************************************************
 //
+// Informs an application of the SD drive mount status
+//
+// If hooked, this function will be called when loader mounts the SD drive.
+//
+// void MyMountFunc(uint32_t error);
+//
+//*****************************************************************************
+#define BL_MOUNT_FN_HOOK        MyMountFunc
+
+//*****************************************************************************
+//
+// Informs an application of the SD drive image file open status.
+//
+// If hooked, this function will be called when loader opens the SD drive.
+//
+// void MyOpenFunc(uint32_t error);
+//
+//*****************************************************************************
+#define BL_OPEN_FN_HOOK         MyOpenFunc
+
+//*****************************************************************************
+//
+// Informs an application that the flash memory process has started.
+//
+// If hooked, this function will be called when loader begins the firmware
+// flash process.
+//
+// void MyBeginFunc(uint32_t error);
+//
+//*****************************************************************************
+#define BL_BEGIN_FN_HOOK        MyBeginFunc
+
+//*****************************************************************************
+//
+// Informs an application that the flash memory process has completed.
+//
+// If hooked, this function will be called when loader completes the firmware
+// flash process.
+//
+// void MyEndFunc(uint32_t error);
+//
+//*****************************************************************************
+#define BL_END_FN_HOOK          MyEndFunc
+
+//*****************************************************************************
+//
 // Informs an application of download progress.
 //
 // If hooked, this function will be called periodically during firmware
@@ -346,6 +392,17 @@
 //*****************************************************************************
 #define BL_PROGRESS_FN_HOOK     MyProgressFunc
 
+//*****************************************************************************
+//
+// Informs application that the flash memory process is exiting the bootloader.
+//
+// If hooked, this function will be called when loader completes the firmware
+// flash process.
+//
+// void MyExitFunc(uint32_t error);
+//
+//*****************************************************************************
+#define BL_EXIT_FN_HOOK         MyExitFunc
 
 //*****************************************************************************
 //
@@ -355,244 +412,178 @@
 // memory space.
 //
 //*****************************************************************************
-#define APP_FILE_NAME           "bootld.bin"
+#define IMAGE_FILE_NAME           "PMX42.bin"
 
 //*****************************************************************************
 //
-// This defines the LED's that will be used to blink during bootloader
-// update process. For the PMX42, the STAT1_LED is on PP2
+// PMX42 SD Card Socket SPI Pin Assignments
+//
+// .baseAddr = SSI1_BASE,          /* SPI base address */
+// .portSCK  = GPIO_PORTB_BASE,    /* SPI SCK PORT */
+// .pinSCK   = GPIO_PIN_5,         /* SCK PIN (PB5) */
+// .portMISO = GPIO_PORTE_BASE,    /* SPI MISO PORT */
+// .pinMISO  = GPIO_PIN_5,         /* MISO PIN (PE5) */
+// .portMOSI = GPIO_PORTE_BASE,    /* SPI MOSI PORT */
+// .pinMOSI  = GPIO_PIN_4,         /* MOSI PIN (PE4) */
+// .portCS   = GPIO_PORTB_BASE,    /* GPIO CS PORT */
+// .pinCS    = GPIO_PIN_4          /* CS PIN (PB4) */
 //
 //*****************************************************************************
-#define LED_GPIO_PORT_BASE      GPIO_PORTP_BASE
-#define LED_GPIO_SYSCTL_PERIPH  SYSCTL_PERIPH_GPIOP
-#define LED_PORT_PIN            GPIO_PIN_2
 
-/* PMX42 - HARDWARE REV-B
- *
- * Configure the appropriate pins to be SSI instead of GPIO. The FSS (CS)
- * signal is directly driven to ensure that we can hold it low through a
- * complete transaction with the SD card. For the PMX42, the SD drive
- * is wired to the following I/O's for SSI1:
- *
- *  PK7 -> CS_SD     (CS_N)
- *  PB5 -> SSI1CLK   (SCK)
- *  PE4 -> SSI1XDAT0 (MOSI)
- *  PE5 -> SSI1XDAT1 (MISO)
- */
+// Peripherals used by SD drive
+#define SD_SYSCTL_PERIPH_SSI            SYSCTL_PERIPH_SSI1
+#define SD_SYSCTL_PERIPH_GPIO_SCLK      SYSCTL_PERIPH_GPIOB
+#define SD_SYSCTL_PERIPH_GPIO_MOSI      SYSCTL_PERIPH_GPIOE
+#define SD_SYSCTL_PERIPH_GPIO_MISO      SYSCTL_PERIPH_GPIOK
+
+/* Base port for SD SSI */
+#define SD_SSI_BASE                     SSI1_BASE
+
+/* SD Drive SCLK port/pin definitions */
+#define SD_GPIO_SCLK_BASE               GPIO_PORTB_BASE
+#define SD_GPIO_SCLK_PINCFG             GPIO_PB5_SSI1CLK
+#define SD_GPIO_SCLK_PIN                GPIO_PIN_5
+
+/* SD Drive MOSI port/pin definitions */
+#define SD_GPIO_MOSI_BASE               GPIO_PORTE_BASE
+#define SD_GPIO_MOSI_PINCFG             GPIO_PE4_SSI1XDAT0
+#define SD_GPIO_MOSI_PIN                GPIO_PIN_4
+
+/* SD Drive MISO port/pin definitions */
+#define SD_GPIO_MISO_BASE               GPIO_PORTE_BASE
+#define SD_GPIO_MISO_PINCFG             GPIO_PE5_SSI1XDAT1
+#define SD_GPIO_MISO_PIN                GPIO_PIN_5
+
+/* SD Drive FSS port/pin definitions */
+#define SD_GPIO_FSS_BASE                GPIO_PORTB_BASE
+#define SD_GPIO_FSS_PIN                 GPIO_PIN_4
+
+//*****************************************************************************
+// THE UART IS AVAILABLE FOR DEBUG OUTPUT MESSAGE SUPPORT
+//*****************************************************************************
+
+/* Set to include UART console on UART0 */
+#define ENABLE_UART_CONSOLE     0
 
 //*****************************************************************************
 //
-// Selects the SSI port as the port for communicating with the boot loader.
+// Selects the baud rate to be used for the UART.
 //
-// Depends on: None
-// Exclusive of: CAN_ENABLE_UPDATE, ENET_ENABLE_UPDATE, I2C_ENABLE_UPDATE,
-//               UART_ENABLE_UPDATE, USB_ENABLE_UPDATE
-// Requires: SSI_CLOCK_ENABLE, SSIx_BASE, SSI_CLKPIN_CLOCK_ENABLE,
-//           SSI_CLKPIN_BASE, SSI_CLKPIN_PCTL, SSI_CLKPIN_POS,
-//           SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE, SSI_FSSPIN_PCTL,
-//           SSI_FSSPIN_POS, SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE,
-//           SSI_MISOPIN_PCTL, SSI_MISOPIN_POS, SSI_MOSIPIN_CLOCK_ENABLE,
-//           SSI_MOSIPIN_BASE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
+// Depends on: UART_ENABLE_UPDATE, CRYSTAL_FREQ
+// Exclusive of: UART_AUTOBAUD
+// Requires: None
 //
 //*****************************************************************************
-#define SSI_ENABLE_UPDATE
+#define UART_FIXED_BAUDRATE     115200
 
 //*****************************************************************************
 //
-// Selects the clock enable for the SSI peripheral module
+// Selects the clock enable for the UART peripheral module
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSIx_BASE
+// Requires: UARTx_BASE
 //
 //*****************************************************************************
-#define SSI_CLOCK_ENABLE        SYSCTL_RCGCSSI_R1   /* SSI1 */
+#define UART_CLOCK_ENABLE         SYSCTL_RCGCUART_R0
 
 //*****************************************************************************
 //
-// Selects the base address of the SSI peripheral module
+// Selects the base address of the UART peripheral module
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_CLOCK_ENABLE
+// Requires: UART_CLOCK_ENABLE
 //
 //*****************************************************************************
-#define SSIx_BASE               SSI1_BASE
+#define UARTx_BASE                UART0_BASE
 
 //*****************************************************************************
 //
-// Selects the clock enable for the GPIO corresponding to SSI CLK pin
+// Selects the clock enable for the GPIO corresponding to UART RX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_CLKPIN_BASE, SSI_CLKPIN_PCTL and SSI_CLKPIN_POS
+// Requires: UART_RXPIN_BASE, UART_RXPIN_PCTL and UART_RXPIN_POS
 //
 //*****************************************************************************
-#define SSI_CLKPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R1      /* PB5 */
+#define UART_RXPIN_CLOCK_ENABLE   SYSCTL_RCGCGPIO_R0
 
 //*****************************************************************************
 //
-// Selects the base address for the GPIO corresponding to SSI CLK pin
+// Selects the base address for the GPIO corresponding to UART RX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_PCTL and SSI_CLKPIN_POS
+// Requires: UART_RXPIN_CLOCK_ENABLE, UART_RXPIN_PCTL and UART_RXPIN_POS
 //
 //*****************************************************************************
-#define SSI_CLKPIN_BASE         GPIO_PORTB_BASE         /* PB5 */
+#define UART_RXPIN_BASE         GPIO_PORTA_BASE
 
 //*****************************************************************************
 //
-// Selects the port control value for the GPIO corresponding to SSI CLK pin
+// Selects the port control value for the GPIO corresponding to UART RX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_BASE and SSI_CLKPIN_POS
+// Requires: UART_RXPIN_CLOCK_ENABLE, UART_RXPIN_BASE and UART_RXPIN_POS
 //
 //*****************************************************************************
-//#define SSI_CLKPIN_PCTL          0x2
+#define UART_RXPIN_PCTL         0x1
 
 //*****************************************************************************
 //
-// Selects the pin number for the GPIO corresponding to SSI CLK pin
+// Selects the pin number for the GPIO corresponding to UART RX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_CLKPIN_CLOCK_ENABLE, SSI_CLKPIN_BASE and SSI_CLKPIN_PCTL
+// Requires: UART_RXPIN_CLOCK_ENABLE, UART_RXPIN_BASE and UART_RXPIN_PCTL
 //
 //*****************************************************************************
-#define SSI_CLKPIN_POS          5                       /* PB5 */
+#define UART_RXPIN_POS          0
 
 //*****************************************************************************
 //
-// Selects the clock enable for the GPIO corresponding to SSI FSS pin
+// Selects the clock enable for the GPIO corresponding to UART TX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_FSSPIN_BASE, SSI_FSSPIN_PCTL and SSI_FSSPIN_POS
+// Requires: UART_TXPIN_BASE, UART_TXPIN_PCTL and UART_TXPIN_POS
 //
 //*****************************************************************************
-#define SSI_FSSPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R9      /* PK7 */
+#define UART_TXPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R0
 
 //*****************************************************************************
 //
-// Selects the base address for the GPIO corresponding to SSI FSS pin
+// Selects the base address for the GPIO corresponding to UART TX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_PCTL and SSI_FSSPIN_POS
+// Requires: UART_TXPIN_CLOCK_ENABLE, UART_TXPIN_PCTL and UART_TXPIN_POS
 //
 //*****************************************************************************
-#define SSI_FSSPIN_BASE         GPIO_PORTK_BASE         /* PK7 */
+#define UART_TXPIN_BASE         GPIO_PORTA_BASE
 
 //*****************************************************************************
 //
-// Selects the port control value for the GPIO corresponding to SSI FSS pin
+// Selects the port control value for the GPIO corresponding to UART TX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE and SSI_FSSPIN_POS
+// Requires: UART_TXPIN_CLOCK_ENABLE, UART_TXPIN_BASE and UART_TXPIN_POS
 //
 //*****************************************************************************
-//#define SSI_FSSPIN_PCTL          0x2
+#define UART_TXPIN_PCTL         0x1
 
 //*****************************************************************************
 //
-// Selects the pin number for the GPIO corresponding to SSI FSS pin
+// Selects the pin number for the GPIO corresponding to UART TX pin
 //
-// Depends on: SSI_ENABLE_UPDATE
+// Depends on: UART_ENABLE_UPDATE
 // Exclusive of: None
-// Requires: SSI_FSSPIN_CLOCK_ENABLE, SSI_FSSPIN_BASE and SSI_FSSPIN_PCTL
+// Requires: UART_TXPIN_CLOCK_ENABLE, UART_TXPIN_BASE and UART_TXPIN_PCTL
 //
 //*****************************************************************************
-#define SSI_FSSPIN_POS          7                       /* PK7 */
-
-//*****************************************************************************
-//
-// Selects the clock enable for the GPIO corresponding to SSI MISO pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MISOPIN_BASE, SSI_MISOPIN_PCTL and SSI_MISOPIN_POS
-//
-//*****************************************************************************
-#define SSI_MISOPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R4     /* PE5 */
-
-//*****************************************************************************
-//
-// Selects the base address for the GPIO corresponding to SSI MISO pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_PCTL and SSI_MISOPIN_POS
-//
-//*****************************************************************************
-#define SSI_MISOPIN_BASE        GPIO_PORTE_BASE          /* PE5 */
-
-//*****************************************************************************
-//
-// Selects the port control value for the GPIO corresponding to SSI MISO pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE and SSI_MISOPIN_POS
-//
-//*****************************************************************************
-//#define SSI_MISOPIN_PCTL         0x2
-
-//*****************************************************************************
-//
-// Selects the pin number for the GPIO corresponding to SSI MISO pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MISOPIN_CLOCK_ENABLE, SSI_MISOPIN_BASE and SSI_MISOPIN_PCTL
-//
-//*****************************************************************************
-#define SSI_MISOPIN_POS         5                       /* PE5 */
-
-//*****************************************************************************
-//
-// Selects the clock enable for the GPIO corresponding to SSI MOSI pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MOSIPIN_BASE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
-//
-//*****************************************************************************
-#define SSI_MOSIPIN_CLOCK_ENABLE SYSCTL_RCGCGPIO_R4     /* PE4 */
-
-//*****************************************************************************
-//
-// Selects the base address for the GPIO corresponding to SSI MOSI pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_PCTL and SSI_MOSIPIN_POS
-//
-//*****************************************************************************
-#define SSI_MOSIPIN_BASE        GPIO_PORTE_BASE         /* PE4 */
-
-//*****************************************************************************
-//
-// Selects the port control value for the GPIO corresponding to SSI MOSI pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_BASE and SSI_MOSIPIN_POS
-//
-//*****************************************************************************
-//#define SSI_MOSIPIN_PCTL         0x2
-
-//*****************************************************************************
-//
-// Selects the pin number for the GPIO corresponding to SSI MOSI pin
-//
-// Depends on: SSI_ENABLE_UPDATE
-// Exclusive of: None
-// Requires: SSI_MOSIPIN_CLOCK_ENABLE, SSI_MOSIPIN_BASE and SSI_MOSIPIN_PCTL
-//
-//*****************************************************************************
-#define SSI_MOSIPIN_POS         4                       /* PE4 */
+#define UART_TXPIN_POS          1
 
 #endif // __BL_CONFIG_H__

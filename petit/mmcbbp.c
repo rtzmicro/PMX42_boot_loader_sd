@@ -35,12 +35,9 @@
 #include "bl_config.h"
 #include "bootloader/bl_flash.h"
 #include "bootloader/bl_hooks.h"
-#include "bootloader/bl_ssi.h"
+
 #include "diskio.h"
 #include "petit/pffconf.h"
-
-extern void BlinkRed(int);
-extern void BlinkGreen(int);
 
 /*--------------------------------------------------------------------------
 
@@ -80,7 +77,13 @@ void xmit_mmc (
 	BYTE dat			/* Data to be sent */
 )
 {
-	 SSISend(&dat, 1);
+    uint32_t ui32RcvDat;
+
+    /* Write the data to the tx fifo */
+    ROM_SSIDataPut(SD_SSI_BASE, dat);
+
+    /* flush data read during the write */
+    ROM_SSIDataGet(SD_SSI_BASE, &ui32RcvDat);
 }
 
 
@@ -92,9 +95,15 @@ void xmit_mmc (
 static
 BYTE rcvr_mmc (void)
 {
-    BYTE dat;
-    SSIReceive(&dat, 1);
-    return dat;
+    uint32_t ui32RcvDat;
+
+    /* write dummy data */
+    ROM_SSIDataPut(SD_SSI_BASE, 0xFF);
+
+    /* read data frm rx fifo */
+    ROM_SSIDataGet(SD_SSI_BASE, &ui32RcvDat);
+
+    return (BYTE)ui32RcvDat;
 }
 
 
@@ -178,6 +187,7 @@ BYTE send_cmd (
 
 ---------------------------------------------------------------------------*/
 
+extern void ConfigureSSI(void);
 
 /*-----------------------------------------------------------------------*/
 /* Initialize Disk Drive                                                 */
@@ -188,7 +198,7 @@ DSTATUS disk_initialize (void)
 	BYTE n, cmd, ty, buf[4];
 	UINT tmr;
 
-	//init_port();
+	//ConfigureSSI();
 
 	CS_H();
 	skip_mmc(10);			/* Dummy clocks */

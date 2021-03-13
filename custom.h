@@ -1,20 +1,19 @@
 //*****************************************************************************
 //
-// STC-1200 Digital Transport Controller Boot Loader for Ampex MM-1200
+// X24015 SD Boot Loader
 //
-// Copyright (C) 2016-2018, RTZ Professional Audio, LLC
+// Copyright (C) 2021, RTZ MICROSYSTEMS LLC
 // All Rights Reserved
-//
-// RTZ is registered trademark of RTZ Professional Audio, LLC
 //
 //*****************************************************************************
 
 #ifndef __CUSTOM_H
 #define __CUSTOM_H
 
-/*** STC-1200 Hardware Constants ***********************************************/
-
-#define HW_REV			1			/* 0=A, 1=B, 2=C, 3=D etc  */
-
+/* External Debug Function Prototypes */
+extern void ConfigureUART(void);
+extern void UARTPutch(char ch);
+extern void UARTPuts(char* s);
+extern void UARTprintf(const char *pcString, ...);
 
 #endif /* __CUSTOM_H */

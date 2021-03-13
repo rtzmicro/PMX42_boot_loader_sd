@@ -33,27 +33,51 @@
 // in the normal case where no override functions are provided.
 //
 //*****************************************************************************
+
 #ifdef BL_HW_INIT_FN_HOOK
 extern void BL_HW_INIT_FN_HOOK(void);
 #endif
+
 #ifdef BL_INIT_FN_HOOK
 extern void BL_INIT_FN_HOOK(void);
 #endif
+
 #ifdef BL_REINIT_FN_HOOK
 extern void BL_REINIT_FN_HOOK(void);
 #endif
+
 #ifdef BL_START_FN_HOOK
 extern void BL_START_FN_HOOK(void);
 #endif
+
+#ifdef BL_MOUNT_FN_HOOK
+extern void BL_MOUNT_FN_HOOK(uint32_t error);
+#endif
+
+#ifdef BL_OPEN_FN_HOOK
+extern void BL_OPEN_FN_HOOK(uint32_t error);
+#endif
+
+#ifdef BL_BEGIN_FN_HOOK
+extern void BL_BEGIN_FN_HOOK(void);
+#endif
+
 #ifdef BL_PROGRESS_FN_HOOK
 extern void BL_PROGRESS_FN_HOOK(uint32_t ui32Completed, uint32_t ui32Total);
 #endif
+
 #ifdef BL_END_FN_HOOK
 extern void BL_END_FN_HOOK(void);
 #endif
+
+#ifdef BL_EXIT_FN_HOOK
+extern void BL_EXIT_FN_HOOK(void);
+#endif
+
 #ifdef BL_DECRYPT_FN_HOOK
 extern void BL_DECRYPT_FN_HOOK(uint8_t *pui8Buffer, uint32_t ui32Size);
 #endif
+
 #ifdef BL_CHECK_UPDATE_FN_HOOK
 extern uint32_t BL_CHECK_UPDATE_FN_HOOK(void);
 #endif

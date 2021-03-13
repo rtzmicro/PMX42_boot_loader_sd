@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include "inc/hw_gpio.h"
 #include "inc/hw_flash.h"
 #include "inc/hw_i2c.h"
@@ -32,11 +33,9 @@
 #include "inc/hw_ssi.h"
 #include "inc/hw_sysctl.h"
 #include "inc/hw_types.h"
-#include "inc/hw_uart.h"
 #include "bl_config.h"
 #include "bootloader/bl_flash.h"
 #include "bootloader/bl_hooks.h"
-#include "bootloader/bl_ssi.h"
 #include "driverlib/gpio.h"
 #include "driverlib/pin_map.h"
 #include "driverlib/ssi.h"
@@ -58,11 +57,10 @@
 static BYTE bWriteBuffer[WRITE_DATA_PACKET_SIZE];
 static FATFS fatfs;
 
-// Helper Functions
-static void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
-                         uint32_t ui32BitRate, uint32_t ui32DataWidth);
-static void BlinkGreen(int n);
-static void BlinkRed(int n);
+// Function Prototypes
+
+void ConfigureSSIPort(uint32_t ui32Protocol, uint32_t ui32Mode,
+                      uint32_t ui32BitRate, uint32_t ui32DataWidth);
 
 //*****************************************************************************
 //
@@ -150,8 +148,7 @@ SwapWord(uint32_t x)
 //
 //*****************************************************************************
 
-void
-ConfigureDevice(void)
+void ConfigureDevice(void)
 {
 #ifdef CRYSTAL_FREQ
     //
@@ -204,96 +201,80 @@ ConfigureDevice(void)
                          SYSCTL_RCC_OSCSRC_MAIN);
 #endif
 #endif
-
-    //
-    // Enable SD SSI peripheral
-    //
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI1);
-
-    //
-    // Enable the clocks to the SSI and GPIO modules.
-    //
-    HWREG(SYSCTL_RCGCGPIO) |= (SSI_CLKPIN_CLOCK_ENABLE |
-                               SSI_FSSPIN_CLOCK_ENABLE |
-                               SSI_MISOPIN_CLOCK_ENABLE |
-                               SSI_MOSIPIN_CLOCK_ENABLE);
-    HWREG(SYSCTL_RCGCSSI) |= SSI_CLOCK_ENABLE;
-
-    //
-    // Make the pin be peripheral controlled.
-    //
-    HWREG(SSI_CLKPIN_BASE + GPIO_O_AFSEL) |= SSI_CLK;
-    HWREG(SSI_CLKPIN_BASE + GPIO_O_PCTL) |= SSI_CLK_PCTL;
-    HWREG(SSI_CLKPIN_BASE + GPIO_O_DEN) |= SSI_CLK;
-    HWREG(SSI_CLKPIN_BASE + GPIO_O_ODR) &= ~(SSI_CLK);
-
-    HWREG(SSI_FSSPIN_BASE + GPIO_O_AFSEL) |= SSI_CS;
-    HWREG(SSI_FSSPIN_BASE + GPIO_O_PCTL) |= SSI_CS_PCTL;
-    HWREG(SSI_FSSPIN_BASE + GPIO_O_DEN) |= SSI_CS;
-    HWREG(SSI_FSSPIN_BASE + GPIO_O_ODR) &= ~(SSI_CS);
-
-    HWREG(SSI_MISOPIN_BASE + GPIO_O_AFSEL) |= SSI_TX;
-    HWREG(SSI_MISOPIN_BASE + GPIO_O_PCTL) |= SSI_TX_PCTL;
-    HWREG(SSI_MISOPIN_BASE + GPIO_O_DEN) |= SSI_TX;
-    HWREG(SSI_MISOPIN_BASE + GPIO_O_ODR) &= ~(SSI_TX);
-
-    HWREG(SSI_MOSIPIN_BASE + GPIO_O_AFSEL) |= SSI_RX;
-    HWREG(SSI_MOSIPIN_BASE + GPIO_O_PCTL) |= SSI_RX_PCTL;
-    HWREG(SSI_MOSIPIN_BASE + GPIO_O_DEN) |= SSI_RX;
-    HWREG(SSI_MOSIPIN_BASE + GPIO_O_ODR) &= ~(SSI_RX);
-
-    // Set the SSI protocol to Motorola with default
-    // clock high and data valid on the rising edge.
-    // Motorola Mode 0 (CPOL=0 and CPHA=0)
-    // SSU clock 100kHz
-
-    ConfigureSSI(SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 100000, 8);
-
-    // Enable the synchronous serial interface.
-
-    HWREG(SSIx_BASE + SSI_O_CR1) |= SSI_CR1_SSE;
 }
 
 //*****************************************************************************
 //
 //! Configure the SSI port the SPI for the SD interface in SPI mode.
-//!
 //
 //*****************************************************************************
 
-void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
-                  uint32_t ui32BitRate, uint32_t ui32DataWidth)
+void ConfigureSSI(void)
 {
-    uint32_t ui32MaxBitRate;
-    uint32_t ui32RegVal;
-    uint32_t ui32PreDiv;
-    uint32_t ui32SCR;
-    uint32_t ui32SPH_SPO;
+    /* Enable SD SSI peripherals */
 
-    uint32_t ui32SSIClk = 120000000;
+    ROM_SysCtlPeripheralEnable(SD_SYSCTL_PERIPH_SSI);
+    ROM_SysCtlPeripheralEnable(SD_SYSCTL_PERIPH_GPIO_SCLK);
+    ROM_SysCtlPeripheralEnable(SD_SYSCTL_PERIPH_GPIO_MOSI);
+    ROM_SysCtlPeripheralEnable(SD_SYSCTL_PERIPH_GPIO_MISO);
 
-    // Set the mode.
-    ui32RegVal = (ui32Mode == SSI_MODE_MASTER) ? 0 : SSI_CR1_MS;
-    HWREG(SSIx_BASE + SSI_O_CR1) = ui32RegVal;
+    /* SSI-1 Configure Pins */
 
-    // Set the clock predivider.
-    ui32MaxBitRate = ui32SSIClk / ui32BitRate;
-    ui32PreDiv = 0;
-    do
-    {
-        ui32PreDiv += 2;
-        ui32SCR = (ui32MaxBitRate / ui32PreDiv) - 1;
-    }
-    while(ui32SCR > 255);
-    HWREG(SSIx_BASE + SSI_O_CPSR) = ui32PreDiv;
+    // Enable pin for SSI SSI1CLK
+    ROM_GPIOPinConfigure(SD_GPIO_SCLK_PINCFG);
+    ROM_GPIOPinTypeSSI(SD_GPIO_SCLK_BASE, SD_GPIO_SCLK_PIN);
 
-    // Set protocol and clock rate.
-    ui32SPH_SPO = (ui32Protocol & 3) << 6;
-    ui32Protocol &= SSI_CR0_FRF_M;
+    // Enable pin for SSI SSI1XDAT0(MOSI)
+    ROM_GPIOPinConfigure(SD_GPIO_MOSI_PINCFG);
+    ROM_GPIOPinTypeSSI(SD_GPIO_MOSI_BASE, SD_GPIO_MOSI_PIN);
 
-    ui32RegVal = (ui32SCR << 8) | ui32SPH_SPO | ui32Protocol | (ui32DataWidth - 1);
+    // Enable pin for SSI SSI1XDAT1(MISO)
+    ROM_GPIOPinConfigure(SD_GPIO_MISO_PINCFG);
+    ROM_GPIOPinTypeSSI(SD_GPIO_MISO_BASE, SD_GPIO_MISO_PIN);
 
-    HWREG(SSIx_BASE + SSI_O_CR0) = ui32RegVal;
+    // Enable pin PB4 for SSI1 SSI1FSS
+    //GPIOPinConfigure(SD_GPIO_FSS_PINCFG);
+    //GPIOPinTypeSSI(SD_GPIO_FSS_BASE, SD_GPIO_FSS_PIN);
+    // Enable pin PK7 for GPIOOutput (SSI1FSS_SD)
+    ROM_GPIOPinTypeGPIOOutput(SD_GPIO_FSS_BASE, SD_GPIO_FSS_PIN);
+
+    /* Configure pad settings */
+
+    /* SCLK (PB5) */
+    MAP_GPIOPadConfigSet(SD_GPIO_SCLK_BASE,
+                         SD_GPIO_SCLK_PIN,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
+    /* MOSI (PE4) */
+    MAP_GPIOPadConfigSet(SD_GPIO_MOSI_BASE,
+                         SD_GPIO_MOSI_PIN,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
+    /* MISO (PE5) */
+    MAP_GPIOPadConfigSet(SD_GPIO_MISO_BASE,
+                         SD_GPIO_MISO_PIN,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
+    /* CS (PK7) */
+    MAP_GPIOPadConfigSet(SD_GPIO_FSS_BASE,
+                         SD_GPIO_FSS_PIN,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
+
+    //
+    // Configure and enable the SSI port for SPI master mode.  Use SSI1,
+    // system clock supply, idle clock level low and active low clock in
+    // Freescale SPI mode, master mode, 1MHz SSI frequency, and 8-bit data.
+    // For SPI mode, you can set the polarity of the SSI clock when the SSI
+    // unit is idle.  You can also configure what clock edge you want to
+    // capture data on.  Please reference the datasheet for more information on
+    // the different SPI modes.
+    //
+
+    uint32_t sysclock = 120000000;
+
+    ROM_SSIConfigSetExpClk(SD_SSI_BASE, sysclock, SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 400000, 8);
+
+    //
+    // Enable the SSI1 module.
+    //
+    ROM_SSIEnable(SD_SSI_BASE);
 }
 
 //*****************************************************************************
@@ -306,8 +287,8 @@ void ConfigureSSI(uint32_t ui32Protocol, uint32_t ui32Mode,
 //! \return Never returns.
 //
 //*****************************************************************************
-void
-Updater(void)
+
+void Updater(void)
 {
     uint32_t EraseSize=0;
     uint32_t AppAddress=0;
@@ -317,24 +298,28 @@ Updater(void)
     FRESULT rc;
     UINT br;
 
+    // Initialize UART for console messages
+#if (ENABLE_UART_CONSOLE == 1)
+    ConfigureUART();
+#endif
+
+    // Initialize the SSI controller
+    ConfigureSSI();
+
     // Indicate start of update
 #ifdef BL_START_FN_HOOK
     BL_START_FN_HOOK();
 #endif
 
-    //
-    // Try to mount the SD card
-    //
+    // Attempt to mount the SD file system 10 times.
 
     j = 0;
 
-    // Attempt to mount the SD file system 10 times.
-
     do {
+#ifdef BL_MOUNT_FN_HOOK
+        BL_MOUNT_FN_HOOK(0);
+#endif
         rc = pf_mount(&fatfs);
-
-        // blink the led each attempt
-        BlinkGreen(1);
 
         // try again up to ten times
         j++;
@@ -343,8 +328,9 @@ Updater(void)
 
     if (rc)
     {
-        // Error mounting the SD card
-        BlinkRed((int)rc);
+#ifdef BL_MOUNT_FN_HOOK
+        BL_MOUNT_FN_HOOK(rc);
+#endif
     }
     else
     {
@@ -355,24 +341,35 @@ Updater(void)
         // card (if exist). Blink led on every try.
 
         do {
+            // Notify handler attempt to open file
+#ifdef BL_OPEN_FN_HOOK
+            BL_OPEN_FN_HOOK(0);
+#endif
             // attempt to open SD data file
-            rc = pf_open(APP_FILE_NAME);
-
-            // blink the LED each attempt
-            BlinkGreen(1);
+            rc = pf_open(IMAGE_FILE_NAME);
 
             // try again up to ten times
             j++;
 
         } while(rc && j < 10);
 
-        // Continue if we opened the image file successfully, otherwise exit.
+        // Continue if we opened the image file successfully, otherwise notify error handler and exit.
 
-        if (!rc)
+        if (rc)
+        {
+            // Notify handler that open failed
+#ifdef BL_OPEN_FN_HOOK
+            BL_OPEN_FN_HOOK(rc);
+#endif
+        }
+        else
         {
             // if file size is not multiple of 4 exit otherwise continue
             if ((fatfs.fsize & 0x03) == 0)
             {
+#ifdef BL_BEGIN_FN_HOOK
+                BL_BEGIN_FN_HOOK();
+#endif
                 // Calculate page count that will erase according to app.bin file size
                 EraseSize = fatfs.fsize / FLASH_PAGE_SIZE;
 
@@ -425,33 +422,29 @@ Updater(void)
                     AppAddress += 4;
                 }
 
-                // If done blink led 2 times with long delay.
-                BlinkGreen(2);
+                // Call flash end hook if specified
+#ifdef BL_END_FN_HOOK
+                BL_END_FN_HOOK();
+#endif
             }
         }
     }
 
-    // Reset and disable the SSI peripheral that used by the boot loader.
-    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_SSI1);
-    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_SSI1);
+    // Reset and disable the SSI peripherals used by the boot loader.
+    ROM_SysCtlPeripheralDisable(SD_SYSCTL_PERIPH_SSI);
+    ROM_SysCtlPeripheralReset(SD_SYSCTL_PERIPH_SSI);
 
-    // Reset and disable the GPIO peripheral that used by the boot loader.
-    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOB);
-    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOB);
+    ROM_SysCtlPeripheralDisable(SD_SYSCTL_PERIPH_GPIO_SCLK);
+    ROM_SysCtlPeripheralReset(SD_SYSCTL_PERIPH_GPIO_SCLK);
 
-    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOK);
-    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOK);
+    ROM_SysCtlPeripheralDisable(SD_SYSCTL_PERIPH_GPIO_MOSI);
+    ROM_SysCtlPeripheralReset(SD_SYSCTL_PERIPH_GPIO_MOSI);
 
-    ROM_SysCtlPeripheralDisable(SYSCTL_PERIPH_GPIOE);
-    ROM_SysCtlPeripheralReset(SYSCTL_PERIPH_GPIOE);
+    ROM_SysCtlPeripheralDisable(SD_SYSCTL_PERIPH_GPIO_MISO);
+    ROM_SysCtlPeripheralReset(SD_SYSCTL_PERIPH_GPIO_MISO);
 
-    // Reset and disable the GPIO peripheral that used by the boot loader.
-    ROM_SysCtlPeripheralDisable(LED_GPIO_SYSCTL_PERIPH);
-    ROM_SysCtlPeripheralReset(LED_GPIO_SYSCTL_PERIPH);
-
-    // Indicate end of update
-#ifdef BL_END_FN_HOOK
-    BL_END_FN_HOOK();
+#ifdef BL_EXIT_FN_HOOK
+    BL_EXIT_FN_HOOK();
 #endif
 
     // Disable the SSI clock
@@ -475,40 +468,6 @@ Updater(void)
 
     while(1)
     {
-    }
-}
-
-//*****************************************************************************
-// DEBUG DIAGNOSTICS
-//*****************************************************************************
-
-void BlinkGreen(int n)
-{
-    int i;
-
-    // DEBUG - BLINK STAT1 LED
-
-    for (i=0; i < n; i++)
-    {
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_2, GPIO_PIN_2);
-        ROM_SysCtlDelay(1000000);
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_2, !GPIO_PIN_2);
-        ROM_SysCtlDelay(1000000);
-    }
-}
-
-void BlinkRed(int n)
-{
-    int i;
-
-    // DEBUG - BLINK STAT2 LED
-
-    for (i=0; i < n; i++)
-    {
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_3, GPIO_PIN_3);
-        ROM_SysCtlDelay(1500000);
-        ROM_GPIOPinWrite(LED_GPIO_PORT_BASE, GPIO_PIN_3, !GPIO_PIN_3);
-        ROM_SysCtlDelay(1500000);
     }
 }
 

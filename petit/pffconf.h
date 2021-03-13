@@ -9,8 +9,8 @@
 #define	FORWARD(d)	forward(d)	/* Data in-time processing function (depends on the project) */
 
 /* SD drive chip select */
-#define CS_H()      HWREG(SSI_FSSPIN_BASE + (GPIO_O_DATA + (SSI_FSSPIN_POS << 2))) = SSI_FSSPIN_POS
-#define CS_L()      HWREG(SSI_FSSPIN_BASE + (GPIO_O_DATA + (SSI_FSSPIN_POS << 2))) = 0
+#define CS_H()      ROM_GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, GPIO_PIN_7)
+#define CS_L()      ROM_GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, 0);
 
 /*---------------------------------------------------------------------------/
 / Function Configurations
@@ -24,7 +24,6 @@
 #define _FS_FAT12	0	/* Enable FAT12 */
 #define _FS_FAT16	1	/* Enable FAT16 */
 #define _FS_FAT32	1	/* Enable FAT32 */
-
 
 /*---------------------------------------------------------------------------/
 / Locale and Namespace Configurations
