@@ -412,7 +412,7 @@
 // memory space.
 //
 //*****************************************************************************
-#define IMAGE_FILE_NAME           "PMX42.bin"
+#define BL_IMAGE_FILENAME       "PMX42.bin"
 
 //*****************************************************************************
 //
@@ -435,6 +435,7 @@
 #define SD_SYSCTL_PERIPH_GPIO_SCLK      SYSCTL_PERIPH_GPIOB
 #define SD_SYSCTL_PERIPH_GPIO_MOSI      SYSCTL_PERIPH_GPIOE
 #define SD_SYSCTL_PERIPH_GPIO_MISO      SYSCTL_PERIPH_GPIOK
+#define SD_SYSCTL_PERIPH_GPIO_FSS       SYSCTL_PERIPH_GPIOK
 
 /* Base port for SD SSI */
 #define SD_SSI_BASE                     SSI1_BASE
@@ -455,8 +456,8 @@
 #define SD_GPIO_MISO_PIN                GPIO_PIN_5
 
 /* SD Drive FSS port/pin definitions */
-#define SD_GPIO_FSS_BASE                GPIO_PORTB_BASE
-#define SD_GPIO_FSS_PIN                 GPIO_PIN_4
+#define SD_GPIO_FSS_BASE                GPIO_PORTK_BASE
+#define SD_GPIO_FSS_PIN                 GPIO_PIN_7
 
 //*****************************************************************************
 // THE UART IS AVAILABLE FOR DEBUG OUTPUT MESSAGE SUPPORT

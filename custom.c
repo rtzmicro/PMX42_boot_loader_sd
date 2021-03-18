@@ -228,7 +228,7 @@ void MyOpenFunc(uint32_t error)
         // blink the LED
         BlinkGreen(1);
 #if (ENABLE_UART_CONSOLE == 1)
-        UARTprintf("Opening image: %s\n", IMAGE_FILE_NAME);
+        UARTprintf("Opening image: %s\n", BL_IMAGE_FILENAME);
 #endif
     }
 }
